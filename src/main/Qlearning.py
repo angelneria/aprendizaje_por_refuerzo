@@ -43,25 +43,10 @@ def hay_colision(estado, mapa):
 def obtiene_recompensa(estado, destino,mapa, K= 1000):
     if hay_colision(estado, mapa):
         valor = -K
+  
     else:
-        valor = - np.sqrt( (estado[0]-destino[0])**2 + (estado[1]-destino[1])**2)
+        valor = - (abs(estado[0]-destino[0]) + abs(estado[1]-destino[1]))
     return valor
-
-
-def visualiza_recompensas(nav_estados):
-    visualiza_mapa()
-    recompensas = [obtiene_recompensa(e) for e in nav_estados]
-    recompensas = [np.nan if elemento == -1000 else elemento for elemento in recompensas]
-    max_recompensa = np.nanmax(recompensas)
-    min_recompensa = np.nanmin(recompensas)
-    for e in nav_estados:
-        r = obtiene_recompensa(e)
-        if r == -1000:
-            continue
-        a = (r-min_recompensa)/(max_recompensa-min_recompensa)
-        rect = plt.Rectangle((e[0] - 0.5, e[1] - 0.5), 1, 1, alpha = a,linewidth=1, edgecolor='blue', facecolor='blue')
-        plt.gca().add_patch(rect)
-        
 
 
 def aplica_accion(estado,accion, mapa):
@@ -93,18 +78,6 @@ def aplica_accion(estado,accion, mapa):
     return x,y
         
 
-        
-"""def crea_politica_greedy(nav_estados, nav_acciones):
-    p = []
-    for e in nav_estados:
-        valores = []
-        for a in nav_acciones:
-            e1 = aplica_accion(e,a)
-            valores.append(obtiene_recompensa(e1))
-        accion = nav_acciones[np.argmax(valores)]
-        p.append(accion)
-    return p"""
-
 
 
 def visualiza_politica(politica, nav_estados, mapa, destino):
@@ -125,13 +98,17 @@ def visualiza_politica(politica, nav_estados, mapa, destino):
         
         
         
-def crea_recompensas_sistema(nav_estados, nav_acciones, destino, mapa):
+def crea_recompensas_sistema(nav_estados, nav_acciones, destino, mapa, k1, k2):
     matriz = []
     for e in nav_estados:
-        r = obtiene_recompensa(e, destino, mapa)
-        fila = [r]*len(nav_acciones)
+       
+        fila=[]
+        for a in nav_acciones:
+            next_e = aplica_accion(e, a, mapa)
+            r= obtiene_recompensa(next_e, destino, mapa, k1)
+            fila.append(r)
         if e != destino:
-            fila[0]=-100
+            fila[0]=-k2
         matriz.append(fila)
     return np.array(matriz)
 
@@ -193,22 +170,19 @@ def crea_transiciones_sistema(prob_error, nav_estados, mapa):
                      crea_transiciones_movimiento('O',prob_error, nav_estados, mapa),
                      crea_transiciones_movimiento('NO',prob_error, nav_estados, mapa)])
 
-def aplica_Qlearning(factor_descuento, nav_transiciones_sistema, nav_recompensas_sistema, nav_acciones, nav_estados, mapa, destino):
-    
+def aplica_Qlearning(factor_descuento, nav_transiciones_sistema, nav_recompensas_sistema, nav_acciones, nav_estados, mapa, destino, iteraciones):
+    np.random.seed(1000)
     ejemplo_nav_robot = mdp.QLearning(
     transitions=nav_transiciones_sistema,
     reward=nav_recompensas_sistema,
     discount= factor_descuento,
-    n_iter= 100000
+    n_iter= iteraciones
     )
     ejemplo_nav_robot.setVerbose()
     ejemplo_nav_robot.run()
     nav_politica = [nav_acciones[i] for i in ejemplo_nav_robot.policy]
     visualiza_politica(nav_politica, nav_estados, mapa, destino)
-    
+
     
 
-"""def politica_por_defecto(indices_nav_acciones, politica):
-    arrayIndicesAcciones = np.array([indices_nav_acciones[x] for x in politica])
-    return arrayIndicesAcciones"""
             
