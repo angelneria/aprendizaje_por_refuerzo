@@ -20,6 +20,7 @@ if __name__ == '__main__':
     nav_estados2 = genera_estados(mapa_mediano)
     nav_estados3 = genera_estados(mapa_pequeño)
     
+    
 
     
     print("Aplicando Q-learning al mapa grande con factor de descuento 0,9 y porcentaje de error total del 20% y 200000 iteraciones")
