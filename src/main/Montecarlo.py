@@ -29,7 +29,7 @@ def visualiza_mapa(mapa, destino):
     plt.gca().add_patch(plt.Circle(destino,radius = 0.5,edgecolor = 'red', facecolor = 'red'))
     
 def inicializa_politica(numero_filas, numero_columnas, destino, lista_acciones):
-    politica_inicial= np.empty((numero_filas, numero_columnas), dtype='str')
+    politica_inicial= np.empty((numero_filas, numero_columnas), dtype='U10')
     for x in range(numero_filas):
         for y in range(numero_columnas):
             if (x==destino[1] and y==destino[0]):
@@ -75,7 +75,6 @@ def aplica_accion(estado,accion, mapa):
     x = estado[0]
     y = estado[1]
     
-    
     if accion == 'N':
         y += 1
     elif accion == 'S':
@@ -97,6 +96,7 @@ def aplica_accion(estado,accion, mapa):
         y += 1
         x -= 1
     return x,y
+        
 
 def obtiene_posibles_errores(accion):
     if accion=='N':
@@ -185,19 +185,54 @@ def aplica_Montecarlo(mapa, destino, lista_acciones, estado_inicial, numero_espi
                 coordenada_y = estados_recorridos[estado][1]
                 U+= (factor_descuento**(subrecorrido-estado)) * recompensas[numero_filas*coordenada_x + coordenada_y][indices[acciones_tomadas[estado]]]
             
-            tabla_Racum[estados_recorridos[estado]][acciones_tomadas[estado]]= U
+            tabla_Racum[estados_recorridos[estado]][acciones_tomadas[estado]].append(U)
+            lista_valores = tabla_Racum[estados_recorridos[estado]][acciones_tomadas[estado]]
+            media = sum(lista_valores)/len(lista_valores)
+            tabla_q[estados_recorridos[estado]][acciones_tomadas[estado]] = media
             
         
+        mejores_acciones  = {}
+        for estado, acciones in tabla_q.items():
+            if(estado != destino):
+                recompensa_maxima = max(acciones.values())
+                mejores_acciones_para_estado = [accion for accion, recompensa_accion in acciones.items() if recompensa_accion == recompensa_maxima]
+                mejor_accion = random.choice(mejores_acciones_para_estado)
+                mejores_acciones[estado] = mejor_accion
+
+
+        for estado, mejor_accion_tomada in mejores_acciones.items():
+            politica_inicial[estado[1]][estado[0]] = mejor_accion_tomada
+             
+    print(politica_inicial)
+    return politica_inicial
+    
+
+
+
+def visualiza_politica(politica, nav_estados, mapa, destino):
+    visualiza_mapa(mapa, destino)
+    for p in zip(nav_estados,politica):
+        accion = p[1]
+        if accion=='esperar' or accion =='X':
+            continue
+        estado = p[0]
+        e1 = aplica_accion(estado,accion, mapa)
+        x0 = estado[0]
+        y0 = estado[1]
+        x1 = e1[0]
+        y1 = e1[1]
         
-            
-        
-            
-    
-        
+        plt.gca().arrow(x0, y0, (x1 - x0)*0.6, (y1 - y0)*0.6,
+         head_width=0.3, head_length=0.3, fc='black', ec='black')
     
     
-    
-    
+def leer_por_columnas(politica):
+    politica_forma_matriz = np.array(politica)
+    politica_transpuesta = politica_forma_matriz.T
+    resultado = []
+    for columna in politica_transpuesta:
+        resultado.extend(columna) #forma una lista con los valores de cada columna
+    return resultado
 
 
 
@@ -211,6 +246,13 @@ nav_estados3 = genera_estados(mapa)
 
 nav_recompensas_sistema = crea_recompensas_sistema(nav_estados3, lista_acciones, destino, mapa, 1000, 100)
 
-aplica_Montecarlo(mapa, destino, lista_acciones, estado_actual,1, 0.9, nav_recompensas_sistema, indices_nav_acciones)
+politca_obtenida_montecarlo = aplica_Montecarlo(mapa, destino, lista_acciones, estado_actual,100, 0.9, nav_recompensas_sistema, indices_nav_acciones)
 
 
+politicaBuena=leer_por_columnas(politca_obtenida_montecarlo)
+
+print(nav_estados3)
+print()
+print(politicaBuena)
+
+visualiza_politica(politicaBuena, nav_estados3, mapa, destino)
