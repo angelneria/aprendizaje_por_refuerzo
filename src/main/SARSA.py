@@ -6,6 +6,8 @@ Created on Wed Jun  5 12:51:54 2024
 """
 import random
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 def lee_mapa(fichero):
     with open(fichero,'r') as archivo:
@@ -19,14 +21,12 @@ def lee_mapa(fichero):
         matriz.append(fila)
     return np.array(matriz),(numeros[0],numeros[1])
 
-def inicializa_tabla_q(acciones,numero_filas, numero_columnas, destino):
+def inicializa_tabla_q(acciones,numero_filas, numero_columnas):
     tabla_q = {}
     for x in range(numero_columnas):
         for y in range(numero_filas):
             tabla_q[(x, y)] = {accion: 0 for accion in acciones}
             
-    objetivo = (destino[0], destino[1])
-    tabla_q[objetivo] = {accion: None for accion in acciones}
     return tabla_q
 
 def selecciona_estado_inicial(mapa, destino):
@@ -43,7 +43,8 @@ def selecciona_estado_inicial(mapa, destino):
  
     
 def accion_max_recompensa(estado, tabla_q):
-    acciones_recompensas = tabla_q.get(estado, {})
+    acciones_recompensas = tabla_q.get(estado)
+   
     recompensa_maxima = max(acciones_recompensas.values())
     acciones_maximas = [accion for accion, recompensa in acciones_recompensas.items() if recompensa == recompensa_maxima]
     accion_seleccionada = random.choice(acciones_maximas)
@@ -133,13 +134,59 @@ def obtiene_posibles_errores(accion):
         errores = []
     return errores
 
+def inicializa_politica(numero_filas, numero_columnas, destino, lista_acciones):
 
-def aplica_SARSA(mapa, destino, lista_acciones, numero_espisodios, recompensas, indices, alpha, gamma):
+    politica_inicial= np.empty((numero_filas, numero_columnas), dtype='U10')
+    for x in range(numero_filas):
+        for y in range(numero_columnas):
+            if (x==destino[1] and y==destino[0]):
+                politica_inicial[x,y]= 'X'
+            else:
+                accion = random.choice(lista_acciones)
+                politica_inicial[x,y]= accion
+    return politica_inicial
+
+def visualiza_mapa(mapa, destino):
+    plt.figure(figsize=(len(mapa[0]), len(mapa)))
+    plt.imshow(1-mapa, cmap='gray', interpolation='none')
+    plt.xlim(-0.5, len(mapa[0]) - 0.5)
+    plt.ylim(-0.5, len(mapa) - 0.5)
+    plt.gca().add_patch(plt.Circle(destino,radius = 0.5,edgecolor = 'red', facecolor = 'red'))
+
+def visualiza_politica(politica, nav_estados, mapa, destino):
+    visualiza_mapa(mapa, destino)
+    for p in zip(nav_estados,politica):
+        accion = p[1]
+        if accion=='esperar' or accion =='X':
+            continue
+        estado = p[0]
+        e1 = aplica_accion(estado,accion, mapa)
+        x0 = estado[0]
+        y0 = estado[1]
+        x1 = e1[0]
+        y1 = e1[1]
+        
+        plt.gca().arrow(x0, y0, (x1 - x0)*0.6, (y1 - y0)*0.6,
+         head_width=0.3, head_length=0.3, fc='black', ec='black')
+    
+    
+def leer_por_columnas(politica):
+    politica_forma_matriz = np.array(politica)
+    politica_transpuesta = politica_forma_matriz.T
+    resultado = []
+    for columna in politica_transpuesta:
+        resultado.extend(columna) #forma una lista con los valores de cada columna
+    return resultado
+
+
+def aplica_SARSA(mapa, destino, lista_acciones,lista_estados, numero_espisodios, recompensas, indices, alpha, gamma):
     
     numero_filas= len(mapa)
     numero_columnas = mapa[0].size
-        
-    tabla_q = inicializa_tabla_q(lista_acciones, numero_filas, numero_columnas, destino)
+    
+    politica_inicial= inicializa_politica(numero_filas, numero_columnas, destino, lista_acciones)
+    tabla_q = inicializa_tabla_q(lista_acciones, numero_filas, numero_columnas)
+    
 
     
     for episodio in range(numero_espisodios):
@@ -148,7 +195,7 @@ def aplica_SARSA(mapa, destino, lista_acciones, numero_espisodios, recompensas, 
         
         
         while(estado_inicial != destino):
-            print(estado_inicial, accion_inicial)
+            
             coordenada_x= estado_inicial[0]
             coordenada_y= estado_inicial[1]
             recompensa = recompensas[numero_filas*coordenada_x + coordenada_y][indices[accion_inicial]]
@@ -163,22 +210,36 @@ def aplica_SARSA(mapa, destino, lista_acciones, numero_espisodios, recompensas, 
                 
             estado_actual= aplica_accion(estado_inicial, accion_tomada, mapa)
             accion_a_tomar = accion_max_recompensa(estado_actual, tabla_q)
-            print(estado_actual,accion_a_tomar)
+            
             tabla_q[estado_inicial][accion_inicial] = tabla_q[estado_inicial][accion_inicial] + alpha*(recompensa+gamma*tabla_q[estado_actual][accion_a_tomar]-tabla_q[estado_inicial][accion_inicial])
+           
             
             if not hay_colision(estado_actual, mapa):
                 estado_inicial= estado_actual            
             accion_inicial= accion_a_tomar
+    
+    mejores_acciones  = {}
+    for estado, acciones in tabla_q.items():
+        if(estado != destino):
+            mejores_acciones[estado] = accion_max_recompensa(estado,tabla_q)
+
+
+    for estado, mejor_accion_tomada in mejores_acciones.items():
+        politica_inicial[estado[1]][estado[0]] = mejor_accion_tomada
+    
+    politica_para_lectura=leer_por_columnas(politica_inicial)
+    visualiza_politica(politica_para_lectura, lista_estados, mapa, destino)
+    
         
         
         
 
 
-mapa, destino = lee_mapa("mapa3.txt")   
+mapa, destino = lee_mapa("map.txt")   
 lista_acciones = ['esperar','N','NE','E','SE','S','SO','O','NO']
 indices_nav_acciones = {'esperar': 0, 'N': 1, 'NE': 2, 'E': 3, 'SE': 4, 'S': 5, 'SO': 6, 'O': 7, 'NO': 8}
 nav_estados = genera_estados(mapa)
 nav_recompensas_sistema = crea_recompensas_sistema(nav_estados, lista_acciones, destino, mapa, 1000, 100)
 
 
-aplica_SARSA(mapa, destino, lista_acciones, 1, nav_recompensas_sistema, indices_nav_acciones, 0.5, 0.9)
+aplica_SARSA(mapa, destino, lista_acciones,nav_estados, 100000, nav_recompensas_sistema, indices_nav_acciones, 0.5, 0.9)
